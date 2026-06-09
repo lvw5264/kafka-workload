@@ -4,7 +4,7 @@ version: '2'
 
 services:
   kafka-1:
-    image: docker.io/bitnami/kafka:3.7.0
+    image: docker.io/bitnamilegacy/kafka:3.7.0
     container_name: kafka-1
     environment:
       KAFKA_CFG_NODE_ID: 1
@@ -30,7 +30,7 @@ services:
     user: root
 
   kafka-2:
-    image: docker.io/bitnami/kafka:3.7.0
+    image: docker.io/bitnamilegacy/kafka:3.7.0
     container_name: kafka-2
     environment:
       KAFKA_CFG_NODE_ID: 2
@@ -58,7 +58,7 @@ services:
       - kafka-1
 
   kafka-3:
-    image: docker.io/bitnami/kafka:3.7.0
+    image: docker.io/bitnamilegacy/kafka:3.7.0
     container_name: kafka-3
     environment:
       KAFKA_CFG_NODE_ID: 3
@@ -88,13 +88,16 @@ services:
     image: localhost/antithesis-kafka-workload:latest
     container_name: workload
     volumes:
-      - ./workload-config.json:/app/workload-config.json
+      - ./workload-config.json:/app/workload-config.json:z
     networks:
       - cluster-net
     depends_on:
       - kafka-1
       - kafka-2
       - kafka-3
+    ulimits:
+      nofile: 65536
+      nproc: 4096
 
 networks:
   cluster-net:

@@ -42,16 +42,40 @@ As of August 2025, there are five properties being asserted via the Antithesis S
 
 This workload is intended to run in any environment with a Kafka-compatible cluster. Try it locally with your own Kafka-compatible system!
 
-### Start the Kafka Cluster
+You can build the workload image from within the workload directory and run it locally.
 
-You can build the workload image from within the workload directory by running the following command: 
+The Dockerfile is stored in the workloads/ directory in this repo.
 
 ```bash
-docker build . -t antithesis-kafka-workload:latest
+cd workloads
+```
+
+Then build the container locally. 
+
+> **Note:** You may push the image to another container registry instead of leaving it locally such as Github/Gitlab Container Registry or AWS ECR, make sure to change the docker image tag accordingly.
+
+```bash
+cd workload
+docker build . -t localhost/antithesis-kafka-workload:latest
+```
+
+Once finished, return to the top level of the git repository before running the docker-compose.yaml
+
+```
+cd ../
+```
+
+### Start the Kafka Cluster
+
+The docker-compose.yaml is stored in the config/ directory in this repo.
+
+```bash
+cd config
 ```
 
 You can then run the entire Kafka cluster from within the config directory by running the following command:
 
 ```bash
 docker-compose up -d
+cd ../
 ```
