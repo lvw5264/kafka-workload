@@ -28,6 +28,9 @@ services:
       cluster-net:
         ipv4_address: 10.0.0.15
     user: root
+    volumes:
+      - ./scripts/eventually_kafka_leader.sh:/opt/antithesis/test/v1/kafka/eventually_kafka_leader.sh:z
+      - ./scripts/eventually_all_nodes_up.sh:/opt/antithesis/test/v1/kafka/eventually_all_nodes_up.sh:z
 
   kafka-2:
     image: docker.io/bitnamilegacy/kafka:3.7.0
@@ -87,6 +90,8 @@ services:
   workload:
     image: localhost/antithesis-kafka-workload:latest
     container_name: workload
+    environment:
+      ANTITHESIS_SDK_LOCAL_OUTPUT: /app/logs/sdk_output.jsonl
     volumes:
       - ./workload-config.json:/app/workload-config.json:z
     networks:

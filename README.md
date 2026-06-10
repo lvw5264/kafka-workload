@@ -52,7 +52,7 @@ cd workloads
 
 Then build the container locally. 
 
-> **Note:** You may push the image to another container registry instead of leaving it locally such as Github/Gitlab Container Registry or AWS ECR, make sure to change the docker image tag accordingly.
+> **Note:** When you are an Antithesis customer, [we provide you a container registry to use instead of relying on the local registry.](https://antithesis.com/docs/getting_started/setup/#push-your-images) But you may push the image to another container registry instead of leaving it locally such as Github/Gitlab Container Registry or AWS ECR, make sure to change the docker image tag accordingly.
 
 ```bash
 cd workload
