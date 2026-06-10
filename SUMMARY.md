@@ -81,7 +81,7 @@ https://antithesis.com/docs/using_antithesis/sdk/fallback/
 
 The changes needed to support this are recorded in the following git commit:
 
-https://github.com/lvw5264/kafka-workload/commit/ccc2b9d57e324690b034db6a92598d700a991385
+https://github.com/lvw5264/kafka-workload/commit/f4b4a19b3c20c951b56ee3494380329dd38bb6bc
 
 I report the bash script's `ANTITHESIS_SDK_LOCAL_OUTPUT` with similar commands as above, which for kafka-1 container I set to `ANTITHESIS_SDK_LOCAL_OUTPUT: /opt/bitnami/kafka/logs/sdk_output.jsonl` , below. I see that as per the guide, antithesis_sdk JSONL line does not need to be reported, and there is always a declaration message with `"hit": false` and `condition: false` JSONL before each assertion evaluation `"hit": true` .
 
