@@ -339,15 +339,86 @@ Finally, I noticed for bash scripts, Antithesis does not appear to provide an eq
 
 https://antithesis.com/docs/using_antithesis/sdk/fallback/
 
-I modified the scripts accordingly:
+I modified the scripts accordingly as per this git commit.
 
-On the workload container for its rust backend, to get the output of ANTITHESIS_SDK_LOCAL_OUTPUT variable I had to set the output environment variable:
+For eventually_kafka_leader.sh , I first write the declaration message with `"hit": false` and `condition: false` JSONL akin to the one workload container rust code does:
+
+```
+'{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":false,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+For eventually_kafka_leader.sh , if no elected leader is found, it will emit a JSONL with `"hit": true` and `"condition": false`:
+
+```
+'{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":false,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+For eventually_kafka_leader.sh , if the elected leader is found, it will emit a JSONL with  `"hit": true`  and `"condition"": true` . A possible future TODO is to write the leader ID in the message.
+
+```
+'{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":true,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+For eventually_all_nodes_up.sh , I first write the declaration message with `"hit": false` and `condition: false` JSONL akin to the one workload container rust code does:
+
+```
+'{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+For eventually_all_nodes_up.sh , if some nodes are not found, it will emit a JSONL with `"hit": true` and `"condition": false` . A possible future TODO is to add the discovered node information to details as JSON, which might need jq to be installed on the container.
+
+```
+'{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+For eventually_all_nodes_up.sh , if all nodes are up to TOTAL_BROKERS=3, it will emit a JSONL with  `"hit": true`  and `"condition"": true` . A possible future TODO is to add the discovered node information to details as JSON, which might need jq to be installed on the container.
+
+```
+'{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":true,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}'
+```
+
+I must set bash script's `ANTITHESIS_SDK_LOCAL_OUTPUT` environment variable to give it a place to write, which for kafka-1 container I set to `ANTITHESIS_SDK_LOCAL_OUTPUT: /opt/bitnami/kafka/logs/sdk_output.jsonl` . 
+
+I then ran the test scripts as per these instructions, and they worked great:
+
+```bash
+$ docker-compose -f config/docker-compose.yaml exec kafka-1 /opt/antithesis/test/v1/kafka/eventually_kafka_leader.sh 
+PASS: controller leader is 1
+$ echo $?
+0
+
+$ docker-compose -f config/docker-compose.yaml exec kafka-1 /opt/antithesis/test/v1/kafka/eventually_all_nodes_up.sh
+FAIL: only 2/3 brokers reachable
+$ echo $?
+1
+
+$ docker-compose -f config/docker-compose.yaml exec kafka-1 /opt/antithesis/test/v1/kafka/eventually_all_nodes_up.sh
+PASS: all 3 brokers reachable
+
+$ echo $?
+0
+```
+
+https://antithesis.com/docs/test_templates/testing_locally/#how-to-check-test-templates-locally
+
+The relevant output is below:
+
+```
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":false,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":true,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":true,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+```
+
+And on the workload container for its rust backend, to get the output of ANTITHESIS_SDK_LOCAL_OUTPUT variable I had to set the output environment variable:
 
 ```
 ANTITHESIS_SDK_LOCAL_OUTPUT: /app/logs/sdk_output.jsonl
 ```
 
-I did not modify the workload container's rust code, but is the output of the variable from workload container anyway:
+I did not modify the workload container's rust code, but here is the output of the variable from workload container anyway:
 
 ```
 $ docker-compose exec workload /bin/bash

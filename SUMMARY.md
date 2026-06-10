@@ -6,11 +6,30 @@
 
 > Please assume that the software under test (SUT) will be run in a chaotic environment with [random faults](https://antithesis.com/docs/environment/fault_injection), this should impact your decision on the type of driver command and SDK assertion to use.
 
-## Summary
-
 I, the author Lawrence Wu on 2026-06-09, am summarizing the amendments and updates made to this git repository as part of the "Antithesis Solutions Engineering (SE) Technical Take Home Challenge".
 
 I assume that we are enhancing our existing example for the customer to better understand how Antithesis helps make critical but rare issues easier to find.
+
+## Regressions
+
+> **Note:** The following regressions were found when running docker on my Fedora Linux 44 x86_64 laptop with SELinux enforcing. This is a distro configuration akin to Red Hat Enterprise Linux 10 with SELinux enforcing, which is common in the US Government.
+
+I see that the kafka public repository is only 9-10 months old in recent commits and is meant to be a public template for customer documentation. But I found some regressions in the public template preventing it from starting up. This can add to customer frustration that distracts them from the value of the Antithesis product. 
+
+If I were tasked to try out and see if there were issues with this customer facing template, I'd make the following recommendations for fixes.
+
+* In the README's docker build line, change `antithesis-kafka-workload:latest` to `localhost/antithesis-kafka-workload:latest` just like in docker-compose.yaml, appears to be required on the latest docker versions and in podman primarily.
+* Switch `docker.io/bitnami/kafka:3.7.0` to `docker.io/bitnamilegacy/kafka:3.7.0`
+    * `docker.io/bitnami/kafka:3.7.0` was replaced by Bitnami Secure Images, some of which are a paid product. Rather than leave old versions up, bitnami moved all their old tags to docker.io/bitnamilegacy . https://github.com/bitnami/containers/issues/88895
+* SELinux systems like Fedora requires volumes to be mounted with `:z` to be readable by multiple containers, even if rootless mode or podman is not used.
+    * We need to make sure that `:z` is added to the volume mount path, so it can be accessed by this and other containers. Adding `:z` should be harmless for non SELinux systems.
+* Default open file limit for containers, `ulimit 1024` is too low in Fedora. As such out of the box, the workload gradually informs that there are too many open files. Perhaps on Fedora 44, the ulimit has been set lower than other distros would.
+
+Refer to this git commit for more info:
+
+https://github.com/lvw5264/kafka-workload/commit/e917770266a64174bd81dc8e0c2db46140c2945c
+
+## Summary
 
 I noticed that unlike the etcd repo: 
 
@@ -29,7 +48,9 @@ These are essential conditions to watch out for in customer applications, very v
     * Equivalent of checking from this command in a kafka container, where since 3 are hardcoded it should report 3: `# "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh" --bootstrap-server "localhost:9092" | grep -i ApiVersions`
 
 These changes are recorded in the following git commit:
-    
+
+https://github.com/lvw5264/kafka-workload/commit/1ce5ddcf86180990d6b1343bcc6cb97fec362526
+
 I then ran the test scripts as per these instructions, and they worked great:
 
 ```bash
@@ -52,11 +73,28 @@ $ echo $?
 
 https://antithesis.com/docs/test_templates/testing_locally/#how-to-check-test-templates-locally
 
+## ANTITHESIS_SDK_LOCAL_OUTPUT
+
 Finally, I noticed for bash scripts, Antithesis does not appear to provide an equivalent of the rust SDK environment variable `ANTITHESIS_SDK_LOCAL_OUTPUT` . I have to write JSONL lines manually with bash using the "fallback SDK".
 
 https://antithesis.com/docs/using_antithesis/sdk/fallback/
 
-I report the rust workload's `ANTITHESIS_SDK_LOCAL_OUTPUT` below for informational purposes.
+The changes needed to support this are recorded in the following git commit:
+
+https://github.com/lvw5264/kafka-workload/commit/ccc2b9d57e324690b034db6a92598d700a991385
+
+I report the bash script's `ANTITHESIS_SDK_LOCAL_OUTPUT` with similar commands as above, which for kafka-1 container I set to `ANTITHESIS_SDK_LOCAL_OUTPUT: /opt/bitnami/kafka/logs/sdk_output.jsonl` , below. I see that as per the guide, antithesis_sdk JSONL line does not need to be reported, and there is always a declaration message with `"hit": false` and `condition: false` JSONL before each assertion evaluation `"hit": true` .
+
+```
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":false,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"Controller leader is elected","condition":true,"id":"Controller leader is elected","location":{"class":"","function":"main","file":"eventually_kafka_leader.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":false,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":false,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+{"antithesis_assert":{"hit":true,"must_hit":true,"assert_type":"always","display_type":"Always","message":"All cluster nodes are reachable","condition":true,"id":"All cluster nodes are reachable","location":{"class":"","function":"main","file":"eventually_all_nodes_up.sh","begin_line":1,"begin_column":0},"details":null}}
+```
+
+Also, while I didn't modify the rust workload, I report it's `ANTITHESIS_SDK_LOCAL_OUTPUT` below for informational purposes.
 
 ```
 $ docker-compose exec workload /bin/bash
@@ -75,20 +113,3 @@ root@6a3ecbd9e9f3:/app# cat /app/logs/sdk_output.jsonl
 {"antithesis_assert":{"assert_type":"reachability","condition":false,"details":null,"display_type":"Unreachable","hit":false,"id":"Read message was never written","location":{"begin_column":33,"begin_line":152,"class":"antithesis_kafka_workload::validation::message_integrity","file":"src/validation/message_integrity.rs","function":"<antithesis_kafka_workload::validation::message_integrity::MessageIntegrityValidator as antithesis_kafka_workload::domain::validator::TestValidator>::validate_event"},"message":"Read message was never written","must_hit":false}}
 {"antithesis_assert":{"assert_type":"reachability","condition":false,"details":null,"display_type":"Unreachable","hit":false,"id":"Written message never read","location":{"begin_column":33,"begin_line":156,"class":"antithesis_kafka_workload::validation::message_integrity","file":"src/validation/message_integrity.rs","function":"<antithesis_kafka_workload::validation::message_integrity::MessageIntegrityValidator as antithesis_kafka_workload::domain::validator::TestValidator>::validate_event"},"message":"Written message never read","must_hit":false}}
 ```
-
-### Regressions
-
-> **Note:** The following regressions were found when running docker on my Fedora Linux 44 x86_64 laptop with SELinux enforcing. This is a distro configuration akin to Red Hat Enterprise Linux 10 with SELinux enforcing, which is common in the US Government.
-
-I see that the public repository is only 9-10 months old in recent commits and is meant to be a public template for customer documentation. But I found some regressions in the public template preventing it from starting up. This can add to customer frustration that distracts them from the value of the Antithesis product. 
-
-If I were tasked to try out and see if there were issues with this customer facing template, I'd make the following recommendations for fixes.
-
-* In the README's docker build line, change `antithesis-kafka-workload:latest` to `localhost/antithesis-kafka-workload:latest` just like in docker-compose.yaml, appears to be required on the latest docker versions and in podman primarily.
-* Switch `docker.io/bitnami/kafka:3.7.0` to `docker.io/bitnamilegacy/kafka:3.7.0`
-    * `docker.io/bitnami/kafka:3.7.0` was replaced by Bitnami Secure Images, some of which are a paid product. Rather than leave old versions up, bitnami moved all their old tags to docker.io/bitnamilegacy . https://github.com/bitnami/containers/issues/88895
-* SELinux systems like Fedora requires volumes to be mounted with `:z` to be readable by multiple containers, even if rootless mode or podman is not used.
-    * We need to make sure that `:z` is added to the volume mount path, so it can be accessed by this and other containers. Adding `:z` should be harmless for non SELinux systems.
-* Default open file limit for containers, `ulimit 1024` is too low in Fedora. As such out of the box, the workload gradually informs that there are too many open files. Perhaps on Fedora 44, the ulimit has been set lower than other distros would.
-
-Refer to this git commit for more info:

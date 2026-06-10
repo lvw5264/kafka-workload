@@ -2,13 +2,11 @@
 # Antithesis eventually_ driver script that checks if kafka quorum leader eventually gets elected
 # KAFKA_HOME and BOOTSTRAP server is currently set to work in docker.io/bitnamilegacy/kafka:3.7.0 only
 # Equivalent of checking LeaderId from this command in a kafka container:
-# "/opt/bitnami/kafka/bin/kafka-metadata-quorum.sh" --bootstrap-server "localhost:9092" --describe --status
+# "/opt/bitnami/kafka/bin/kafka-metadata-quorum.sh" --bootstrap-server "localhost:9092" describe --status
 
-# fail out whenever a single bash line has an error, such as if bootstrap server is down
-# https://gist.github.com/akrasic/380bda362e0420be08709152c91ca1f9
-set -euo pipefail
-
+# just in case kafka changes path
 KAFKA_HOME=/opt/bitnami/kafka
+# Use kafka1 container's kafka instance to run command
 BOOTSTRAP=localhost:9092
 
 SDK_TARGETS=()
@@ -32,7 +30,7 @@ fi
 
 QUORUM_LEADER=$("$KAFKA_HOME/bin/kafka-metadata-quorum.sh" \
     --bootstrap-server "$BOOTSTRAP" \
-    --describe --status 2>&1 | grep -E "^LeaderId:" | awk '{print $2}')
+    describe --status 2>&1 | grep -E "^LeaderId:" | awk '{print $2}')
 
 if [ -z "$QUORUM_LEADER" ] || [ "$QUORUM_LEADER" = "-1" ]; then
     if [ ${#SDK_TARGETS[@]} -gt 0 ]; then
